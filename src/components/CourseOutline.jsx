@@ -12,7 +12,7 @@ export default function CourseOutline({ course, onClose }) {
   const fees = getCoursePricing(course.id);
   return <dialog ref={ref} className="academy-course-dialog" aria-labelledby="course-dialog-title" onCancel={onClose} onClick={(event) => { if(event.target === ref.current) onClose(); }}>
     <div className="academy-dialog-inner">
-      <button className="academy-dialog-close" aria-label="Close course outline" onClick={onClose}>×</button>
+      <button type="button" className="academy-dialog-close" aria-label="Close course outline" onClick={onClose}>×</button>
       <span className="academy-eyebrow">{course.duration} · October 5, 2026</span>
       <h2 id="course-dialog-title">{course.title}</h2><p>{course.description}</p>
       <div className="academy-fee-strip"><span>Full tuition <strong>{fees.tuition}</strong></span><span>Scholarship fee <strong>{fees.scholarship}</strong></span></div>
