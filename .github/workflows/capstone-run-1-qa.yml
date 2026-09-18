@@ -22,7 +22,7 @@ jobs:
           git checkout 17ef9191e1ce3b605e7276d34f7233502fda3df9
           cd "$GITHUB_WORKSPACE"
           rsync -a --ignore-existing --exclude='.git/' --exclude='.env' --exclude='.env.*' --exclude='node_modules/' /tmp/ovtech-source/ ./
-          if ! git diff --quiet -- .; then
+          if [ -n "$(git status --porcelain -- public data src/assets)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add public data src/assets
