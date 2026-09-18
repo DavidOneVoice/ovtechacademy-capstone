@@ -1,0 +1,1013 @@
+/* src/pages/Home.css */
+
+:root {
+  --ov-navy: #12233f;
+  --ov-navy-dark: #081426;
+  --ov-gold: #d4af37;
+  --ov-white: #ffffff;
+  --ov-off-white: #f8fafc;
+  --ov-text: #1f2937;
+  --ov-muted: #64748b;
+  --ov-border: #e5e7eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.ov-home {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--ov-white);
+  color: var(--ov-text);
+  overflow-x: hidden;
+}
+
+/* HERO */
+
+.ov-hero {
+  position: relative;
+  padding: 80px 0 100px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.ov-hero-content {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 60px;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.ov-badge {
+  display: inline-flex;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--ov-navy);
+  font-weight: 800;
+  margin-bottom: 24px;
+}
+
+.ov-hero h1 {
+  margin: 0;
+  color: var(--ov-navy);
+  font-size: clamp(3rem, 6vw, 5.6rem);
+  line-height: 0.96;
+  letter-spacing: -4px;
+  font-weight: 950;
+}
+
+.ov-hero h1 span {
+  color: var(--ov-gold);
+}
+
+.ov-hero p {
+  color: var(--ov-muted);
+  line-height: 1.8;
+  font-size: 1.1rem;
+  max-width: 620px;
+  margin: 28px 0 0;
+}
+
+.ov-hero-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 34px;
+}
+
+.ov-primary-btn,
+.ov-secondary-btn {
+  text-decoration: none;
+  padding: 15px 24px;
+  border-radius: 999px;
+  font-weight: 900;
+  text-align: center;
+  transition: 0.25s ease;
+}
+
+.ov-primary-btn {
+  background: var(--ov-navy);
+  color: white;
+  box-shadow: 0 16px 36px rgba(18, 35, 63, 0.24);
+}
+
+.ov-secondary-btn {
+  background: white;
+  color: var(--ov-navy);
+  border: 1px solid var(--ov-border);
+}
+
+.ov-primary-btn:hover,
+.ov-secondary-btn:hover {
+  transform: translateY(-2px);
+}
+
+.ov-trust-list {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.ov-trust-list span {
+  background: var(--ov-off-white);
+  border: 1px solid var(--ov-border);
+  color: var(--ov-navy);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.ov-hero-visual {
+  position: relative;
+}
+
+.ov-main-hero-image {
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  border-radius: 34px;
+  display: block;
+  box-shadow: 0 30px 80px rgba(18, 35, 63, 0.16);
+}
+
+.ov-floating-card {
+  position: absolute;
+  background: white;
+  color: var(--ov-navy);
+  border: 1px solid var(--ov-border);
+  box-shadow: 0 18px 40px rgba(18, 35, 63, 0.14);
+  border-radius: 18px;
+  padding: 14px 17px;
+  font-weight: 900;
+}
+
+.ov-card-analytics {
+  top: 40px;
+  left: -18px;
+}
+
+.ov-card-software {
+  right: -16px;
+  top: 190px;
+}
+
+.ov-card-web {
+  left: 55px;
+  bottom: 35px;
+}
+
+.ov-hero-bg {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.25;
+}
+
+.ov-hero-bg-gold {
+  width: 280px;
+  height: 280px;
+  background: var(--ov-gold);
+  top: 40px;
+  left: -100px;
+}
+
+.ov-hero-bg-navy {
+  width: 280px;
+  height: 280px;
+  background: var(--ov-navy);
+  right: -120px;
+  bottom: 40px;
+}
+
+/* WHY */
+
+.ov-why {
+  background: var(--ov-navy);
+  color: white;
+  padding: 110px 0;
+}
+
+.ov-why-container {
+  width: min(1050px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.ov-section-label,
+.ov-section-head span,
+.ov-build-header span,
+.ov-scholarship-content span,
+.ov-cohort-content span {
+  color: var(--ov-gold);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 0.82rem;
+}
+
+.ov-why h2 {
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 1;
+  letter-spacing: -3px;
+  margin: 18px 0 0;
+}
+
+.ov-why h2 span {
+  color: var(--ov-gold);
+}
+
+.ov-why-container > p {
+  max-width: 780px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.8;
+  font-size: 1.05rem;
+  margin: 26px 0 0;
+}
+
+.ov-why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 54px;
+}
+
+.ov-why-grid div {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 26px;
+  padding: 30px;
+}
+
+.ov-why-grid strong {
+  color: var(--ov-gold);
+}
+
+.ov-why-grid h3 {
+  margin: 16px 0 10px;
+}
+
+.ov-why-grid p {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* SECTION HEAD */
+
+.ov-section-head,
+.ov-build-header {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto 56px;
+  text-align: center;
+}
+
+.ov-section-head h2,
+.ov-build-header h2 {
+  color: var(--ov-navy);
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin: 14px 0 16px;
+}
+
+.ov-section-head p,
+.ov-build-header p {
+  color: var(--ov-muted);
+  line-height: 1.75;
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* LEARNING PATHS */
+
+.ov-paths {
+  padding: 110px 0;
+  background: white;
+}
+
+.ov-paths-grid {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.ov-path-card {
+  background: white;
+  border: 1px solid var(--ov-border);
+  border-radius: 30px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(18, 35, 63, 0.08);
+}
+
+.ov-path-card.featured {
+  border-color: rgba(212, 175, 55, 0.6);
+}
+
+.ov-path-image {
+  height: 220px;
+  overflow: hidden;
+  background: var(--ov-navy);
+}
+
+.ov-path-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ov-path-body {
+  padding: 28px;
+}
+
+.ov-path-body small {
+  color: var(--ov-gold);
+  font-weight: 900;
+}
+
+.ov-path-body h3 {
+  color: var(--ov-navy);
+  font-size: 1.45rem;
+  margin: 12px 0;
+}
+
+.ov-path-body p {
+  color: var(--ov-muted);
+  line-height: 1.7;
+  font-size: 0.96rem;
+}
+
+.ov-course-meta {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0;
+}
+
+.ov-course-meta div {
+  background: var(--ov-off-white);
+  border: 1px solid var(--ov-border);
+  border-radius: 16px;
+  padding: 13px 14px;
+}
+
+.ov-course-meta strong {
+  display: block;
+  color: var(--ov-navy);
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.ov-course-meta span {
+  color: var(--ov-muted);
+  font-size: 0.9rem;
+}
+
+.ov-outline-btn {
+  width: 100%;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.09);
+  color: var(--ov-navy);
+  padding: 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.ov-course-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.ov-course-actions a,
+.ov-modal-actions a {
+  text-decoration: none;
+  text-align: center;
+  padding: 14px 16px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.ov-course-scholarship {
+  background: var(--ov-navy);
+  color: white;
+}
+
+.ov-course-pay {
+  background: var(--ov-gold);
+  color: var(--ov-navy-dark);
+}
+
+/* COHORT BANNER */
+
+.ov-cohort-banner {
+  padding: 100px 7%;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 50px;
+  align-items: center;
+  background: var(--ov-off-white);
+}
+
+.ov-cohort-content h2 {
+  color: var(--ov-navy);
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.1;
+  margin: 15px 0;
+}
+
+.ov-cohort-content p {
+  color: var(--ov-muted);
+  line-height: 1.8;
+  max-width: 600px;
+}
+
+.ov-cohort-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.ov-cohort-image img {
+  width: 100%;
+  display: block;
+  border-radius: 28px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
+}
+
+/* ADVANTAGES */
+
+.ov-advantages {
+  padding: 110px 7%;
+  background: white;
+}
+
+.ov-advantages-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 60px;
+}
+
+.ov-adv-card {
+  background: white;
+  border: 1px solid var(--ov-border);
+  border-radius: 24px;
+  padding: 28px;
+  min-height: 240px;
+  transition: 0.3s ease;
+}
+
+.ov-adv-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(18, 35, 63, 0.08);
+}
+
+.ov-adv-icon {
+  font-size: 2rem;
+  margin-bottom: 18px;
+}
+
+.ov-adv-card h3 {
+  color: var(--ov-navy);
+  margin-bottom: 12px;
+}
+
+.ov-adv-card p {
+  color: var(--ov-muted);
+  line-height: 1.7;
+}
+
+/* STATS */
+
+.ov-stats-section {
+  padding: 85px 7%;
+  background: var(--ov-navy);
+}
+
+.ov-stats-wrapper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px;
+}
+
+.ov-stats-wrapper div {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 26px;
+  padding: 34px 24px;
+  text-align: center;
+}
+
+.ov-stats-wrapper h3 {
+  color: var(--ov-gold);
+  font-size: 3rem;
+  margin: 0 0 10px;
+}
+
+.ov-stats-wrapper p {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 800;
+  margin: 0;
+}
+
+/* FAQ */
+
+.ov-faq-section {
+  padding: 110px 7%;
+  background: var(--ov-off-white);
+}
+
+.ov-faq-accordion {
+  max-width: 900px;
+  margin: 56px auto 0;
+  display: grid;
+  gap: 16px;
+}
+
+.ov-faq-item {
+  background: white;
+  border: 1px solid var(--ov-border);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 12px 35px rgba(18, 35, 63, 0.05);
+}
+
+.ov-faq-question {
+  width: 100%;
+  border: none;
+  background: white;
+  padding: 22px 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ov-faq-question span {
+  color: var(--ov-navy);
+  font-weight: 900;
+}
+
+.ov-faq-question strong {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  background: var(--ov-off-white);
+  color: var(--ov-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.ov-faq-item.active .ov-faq-question strong {
+  background: var(--ov-gold);
+}
+
+.ov-faq-answer {
+  padding: 0 24px 22px;
+}
+
+.ov-faq-answer p {
+  color: var(--ov-muted);
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* MODAL */
+
+.ov-course-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 20, 38, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.ov-course-modal {
+  width: min(760px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 30px;
+  padding: 34px;
+  position: relative;
+}
+
+.ov-course-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: var(--ov-navy);
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.ov-course-modal > span {
+  color: var(--ov-gold);
+  font-weight: 900;
+}
+
+.ov-course-modal h2 {
+  color: var(--ov-navy);
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 12px 0 24px;
+}
+
+.ov-modal-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.ov-modal-summary div {
+  background: var(--ov-off-white);
+  border: 1px solid var(--ov-border);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.ov-modal-summary strong {
+  color: var(--ov-navy);
+}
+
+.ov-modal-summary p {
+  margin: 6px 0 0;
+  color: var(--ov-muted);
+}
+
+.ov-modal-section {
+  margin-top: 24px;
+}
+
+.ov-modal-section h3 {
+  color: var(--ov-navy);
+}
+
+.ov-modal-section ul {
+  color: var(--ov-muted);
+  line-height: 1.9;
+}
+
+.ov-tool-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ov-tool-tags span {
+  background: var(--ov-off-white);
+  color: var(--ov-navy);
+  border: 1px solid var(--ov-border);
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.ov-modal-actions {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* PROJECTS */
+
+.ov-build {
+  padding: 110px 0;
+  background: var(--ov-off-white);
+}
+
+.ov-project-grid {
+  width: min(1180px, calc(100% - 32px));
+  margin: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.ov-project-card {
+  background: white;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid var(--ov-border);
+}
+
+.ov-project-image {
+  height: 240px;
+  overflow: hidden;
+}
+
+.ov-project-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ov-project-content {
+  padding: 26px;
+}
+
+.ov-project-content h3 {
+  color: var(--ov-navy);
+  margin: 0 0 12px;
+}
+
+.ov-project-content p {
+  color: var(--ov-muted);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* SCHOLARSHIP */
+
+.ov-scholarship {
+  padding: 110px 0;
+  background: var(--ov-navy);
+  color: white;
+}
+
+.ov-scholarship-content {
+  width: min(950px, calc(100% - 32px));
+  margin: 0 auto;
+  text-align: center;
+}
+
+.ov-scholarship-content h2 {
+  font-size: clamp(2.4rem, 5vw, 4.6rem);
+  line-height: 1;
+  margin: 16px 0;
+}
+
+.ov-scholarship-content > p {
+  max-width: 760px;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.8;
+}
+
+.ov-scholarship-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 46px 0;
+}
+
+.ov-scholarship-box div {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 28px;
+}
+
+.ov-scholarship-box h3 {
+  color: var(--ov-gold);
+  font-size: 2.3rem;
+  margin: 0;
+}
+
+.ov-scholarship-box p {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ov-scholarship-btn {
+  display: inline-flex;
+  text-decoration: none;
+  background: var(--ov-gold);
+  color: var(--ov-navy-dark);
+  padding: 16px 28px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+/* FLOATING BUTTONS */
+
+.ov-back-top,
+.ov-whatsapp-float {
+  position: fixed;
+  bottom: 24px;
+  z-index: 1500;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 16px 35px rgba(8, 20, 38, 0.22);
+}
+
+.ov-back-top {
+  left: 22px;
+  background: var(--ov-navy);
+}
+
+.ov-whatsapp-float {
+  right: 22px;
+  background: #25d366;
+}
+
+/* TABLET */
+
+@media (max-width: 980px) {
+  .ov-hero-content,
+  .ov-cohort-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .ov-hero-left,
+  .ov-cohort-content {
+    text-align: center;
+  }
+
+  .ov-hero p,
+  .ov-cohort-content p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .ov-hero-actions,
+  .ov-trust-list,
+  .ov-cohort-actions {
+    justify-content: center;
+  }
+
+  .ov-why-grid,
+  .ov-paths-grid,
+  .ov-project-grid {
+    grid-template-columns: 1fr;
+    max-width: 620px;
+  }
+
+  .ov-advantages-grid,
+  .ov-stats-wrapper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ov-cohort-image {
+    order: -1;
+  }
+}
+
+/* MOBILE */
+
+@media (max-width: 700px) {
+  .ov-hero {
+    padding: 48px 0 58px;
+  }
+
+  .ov-hero-content {
+    width: min(100% - 24px, 1180px);
+    gap: 36px;
+  }
+
+  .ov-hero h1 {
+    font-size: 3rem;
+    letter-spacing: -2px;
+  }
+
+  .ov-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ov-main-hero-image {
+    border-radius: 24px;
+  }
+
+  .ov-floating-card {
+    font-size: 0.72rem;
+    padding: 10px 12px;
+  }
+
+  .ov-card-analytics {
+    left: 6px;
+    top: 30px;
+  }
+
+  .ov-card-software {
+    right: 4px;
+    top: 165px;
+  }
+
+  .ov-card-web {
+    left: 30px;
+    bottom: 55px;
+  }
+
+  .ov-why,
+  .ov-paths,
+  .ov-advantages,
+  .ov-build,
+  .ov-scholarship,
+  .ov-faq-section {
+    padding-top: 60px;
+    padding-bottom: 60px;
+  }
+
+  .ov-cohort-banner,
+  .ov-stats-section {
+    padding: 55px 20px;
+  }
+
+  .ov-section-head,
+  .ov-build-header {
+    margin-bottom: 32px;
+  }
+
+  .ov-advantages-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 18px;
+    padding: 0 18px 20px;
+    margin-left: -18px;
+    margin-right: -18px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .ov-adv-card {
+    flex: 0 0 82%;
+    scroll-snap-align: start;
+    min-height: 250px;
+  }
+
+  .ov-stats-wrapper,
+  .ov-scholarship-box,
+  .ov-modal-summary,
+  .ov-modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ov-course-modal {
+    padding: 28px 22px;
+  }
+
+  .ov-back-top,
+  .ov-whatsapp-float {
+    bottom: 18px;
+    width: 50px;
+    height: 50px;
+  }
+}
+
+.ov-icon-card {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #3f3dff, #00c2a8);
+}
+
+.ov-path-icon {
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+  font-size: 3.7rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
+}
+
+.ov-view-all-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 38px;
+}
+
+.ov-view-all-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 15px 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3f3dff, #00c2a8);
+  color: white;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 16px 36px rgba(63, 61, 255, 0.2);
+}

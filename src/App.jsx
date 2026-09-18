@@ -1,0 +1,105 @@
+import Registration from "./pages/Registration";
+import PaymentReturn from "./pages/PaymentReturn";
+import ScholarshipPayment from "./pages/ScholarshipPayment";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import Scholarship from "./pages/Scholarship";
+import Admin from "./pages/Admin";
+import AdminLogin from "./pages/AdminLogin";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import EnrolledStudents from "./pages/EnrolledStudents";
+import GraduatedStudents from "./pages/GraduatedStudents";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import Contact from "./pages/Contact";
+import About from "./pages/About";
+import Courses from "./pages/Courses";
+import LmsDashboard from "./pages/LmsDashboard";
+import AdminLms from "./pages/AdminLms";
+import AdminLiveSessions from "./pages/AdminLiveSessions";
+import AttendancePage from "./pages/AttendancePage";
+import AdminAssistant from "./pages/AdminAssistant";
+import VerifySearch from "./pages/VerifySearch";
+import VerifyCertificate from "./pages/VerifyCertificate";
+import Alumni from "./pages/Alumni";
+import { ADMIN_ROLES, getStoredAdminRole } from "./auth/adminRoles";
+
+const AdminDashboardRoute = () => (
+  getStoredAdminRole() === ADMIN_ROLES.ASSISTANT
+    ? <Navigate to="/admin/assistant" replace />
+    : <Admin />
+);
+
+import "./academy.css";
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/verify" element={<VerifySearch />} />
+        <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
+        <Route path="/alumni" element={<Alumni />} />
+        <Route path="/scholarship" element={<Scholarship />} />
+        <Route path="/register" element={<Registration />} />
+        <Route path="/registration/complete" element={<PaymentReturn />} />
+        <Route path="/scholarship-payment" element={<ScholarshipPayment />} />
+        <Route path="/courses" element={<Courses />} />
+        <Route path="/lms" caseSensitive element={<LmsDashboard />} />
+        <Route
+          path="/LMS"
+          caseSensitive
+          element={<Navigate to="/lms" replace />}
+        />
+        <Route path="/student-lms" element={<Navigate to="/lms" replace />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/attendance/:sessionId" element={<AttendancePage />} />
+
+        <Route
+          path="/admin"
+          element={<ProtectedAdminRoute><AdminDashboardRoute /></ProtectedAdminRoute>}
+        />
+        <Route
+          path="/admin/assistant"
+          element={<ProtectedAdminRoute allowedRoles={[ADMIN_ROLES.ASSISTANT]}><AdminAssistant /></ProtectedAdminRoute>}
+        />
+        <Route
+          path="/admin/lms"
+          element={
+            <ProtectedAdminRoute allowedRoles={[ADMIN_ROLES.ADMIN]}>
+              <AdminLms />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/live-sessions"
+          element={
+            <ProtectedAdminRoute allowedRoles={[ADMIN_ROLES.ADMIN]}>
+              <AdminLiveSessions />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/enrolled-students"
+          element={
+            <ProtectedAdminRoute allowedRoles={[ADMIN_ROLES.ADMIN]}>
+              <EnrolledStudents />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/graduated-students"
+          element={
+            <ProtectedAdminRoute allowedRoles={[ADMIN_ROLES.ADMIN]}>
+              <GraduatedStudents />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;

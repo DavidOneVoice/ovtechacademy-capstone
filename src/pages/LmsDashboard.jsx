@@ -1,0 +1,1279 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getDocsFromServer,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  writeBatch,
+  where,
+} from "firebase/firestore";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import Certificate from "../components/certificate/Certificate";
+import { db } from "../src/firebase";
+import { uploadImageToCloudinary } from "../utils/cloudinary";
+import { createPublicAlumniRecord, publicAlumniRef } from "../services/publicAlumni";
+import { getSafeYouTubeEmbedUrl } from "../lms/youtube";
+import { getResourceAction } from "../lms/resourceLinks";
+import {
+  filterItemsForCurriculumGroup,
+  getResourceDebugRows,
+  getStudentResourceQuery,
+  isCurriculumLesson,
+  LMS_CURRICULUM_COLLECTION,
+  LMS_RESOURCE_COLLECTION,
+  snapshotItems,
+} from "../lms/content";
+import { resolveStudentCurriculumGroup } from "../lms/tracks";
+import { normalizeProgrammeName } from "../data/programmes";
+import {
+  getStudentProgramDay,
+  isItemUnlocked,
+  sortLmsItems,
+} from "../lms/unlocking";
+import {
+  calculateProgressPercentage,
+  getProgressId,
+  saveStudentProgress,
+} from "../lms/progress";
+import "./LmsDashboard.css";
+
+const STORAGE_KEY = "ovtech_lms_student";
+const CERTIFICATE_PROFILE_COLLECTION = "certificateProfile";
+const PRE_RECORDED_ACCESS_TEXT = "pre-recorded videos";
+const LIVE_CLASS_ACCESS_TEXT = "live";
+
+const normalize = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
+const hasValue = (value) => String(value || "").trim().length > 0;
+
+const slugifyTrack = (track) =>
+  String(track || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+const STUDENT_EMAIL_FIELDS = ["email", "emailAddress", "studentEmail"];
+const STUDENT_PHONE_FIELDS = [
+  "whatsapp",
+  "whatsApp",
+  "whatsappNumber",
+  "phone",
+  "phoneNumber",
+  "mobile",
+  "mobileNumber",
+];
+const ENROLLMENT_PACKAGE_FIELDS = [
+  "learningMethod",
+  "package",
+  "packageName",
+  "mode",
+  "enrollmentMode",
+  "selectedPackage",
+  "selectedMode",
+  "plan",
+];
+
+const getStudentName = (student) =>
+  student?.fullName || student?.name || student?.studentName || "Student";
+const getStudentCourse = (student) =>
+  normalizeProgrammeName(
+    student?.track ||
+      student?.course ||
+      student?.courseName ||
+      student?.program ||
+      "",
+  );
+
+const getStudentTracks = (student) =>
+  [
+    getStudentCourse(student),
+    ...(Array.isArray(student?.tracks) ? student.tracks : []),
+    ...(Array.isArray(student?.courses) ? student.courses : []),
+    ...(Array.isArray(student?.enrolledCourses) ? student.enrolledCourses : []),
+  ].filter(Boolean);
+
+const formatAttendanceDate = (dateKey) => {
+  if (!dateKey) return "Date pending";
+  const date = new Date(`${dateKey}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? dateKey
+    : date.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+};
+
+const getEnrollmentPackage = (student) =>
+  ENROLLMENT_PACKAGE_FIELDS.map((field) => student?.[field])
+    .filter(Boolean)
+    .join(" ");
+
+const isPaidOrEnrolled = (student) => {
+  if (student?.cohortId === 'october-2026') {
+    return student.status === 'Enrolled' && (student.applicationType !== 'tuition' ||
+      (student.paymentVerified === true && student.registrationStatus === 'submitted'));
+  }
+  const statusText = normalize(
+    [student?.status, student?.paymentStatus, student?.enrollmentStatus]
+      .filter(Boolean)
+      .join(" "),
+  );
+  return (
+    statusText.includes("enrolled") ||
+    statusText.includes("paid") ||
+    statusText.includes("approved") ||
+    statusText.includes("successful")
+  );
+};
+
+const isSelfPacedStudent = (student) =>
+  student &&
+  isPaidOrEnrolled(student) &&
+  normalize(getEnrollmentPackage(student)).includes(PRE_RECORDED_ACCESS_TEXT);
+
+const isLiveClassStudent = (student) =>
+  student &&
+  isPaidOrEnrolled(student) &&
+  normalize(getEnrollmentPackage(student)).includes(LIVE_CLASS_ACCESS_TEXT);
+
+const hasUnselectedLearningMethod = (student) =>
+  student &&
+  isPaidOrEnrolled(student) &&
+  !hasValue(getEnrollmentPackage(student));
+
+const isInstructorLedStudent = (student) =>
+  isLiveClassStudent(student) || hasUnselectedLearningMethod(student);
+
+const isEligibleStudent = (student) => isPaidOrEnrolled(student);
+
+const fieldMatches = (student, fields, target, normalizer = normalize) =>
+  fields.some(
+    (field) =>
+      hasValue(student?.[field]) && normalizer(student[field]) === target,
+  );
+
+const findEligibleStudent = (docs, login) => {
+  const email = normalize(login.email);
+  const phone = normalizePhone(login.whatsapp);
+
+  return docs
+    .map((item) => ({ id: item.id, ...item.data() }))
+    .find((item) => {
+      const emailMatches =
+        email && fieldMatches(item, STUDENT_EMAIL_FIELDS, email, normalize);
+      const phoneMatches =
+        phone &&
+        fieldMatches(item, STUDENT_PHONE_FIELDS, phone, normalizePhone);
+      return (emailMatches || phoneMatches) && isEligibleStudent(item);
+    });
+};
+
+const uniqueDocs = (snapshots) => {
+  const docsById = new Map();
+  snapshots.forEach((snapshot) =>
+    snapshot.docs.forEach((item) => docsById.set(item.id, item)),
+  );
+  return [...docsById.values()];
+};
+
+const buildLoginQueries = (login) => {
+  const email = login.email.trim();
+  const normalizedEmail = normalize(email);
+  const rawPhone = login.whatsapp.trim();
+  const digitsPhone = normalizePhone(rawPhone);
+  const queries = [];
+
+  if (email) {
+    STUDENT_EMAIL_FIELDS.forEach((field) => {
+      queries.push(
+        query(
+          collection(db, "scholarshipApplications"),
+          where(field, "==", email),
+          limit(1),
+        ),
+      );
+      if (normalizedEmail !== email)
+        queries.push(
+          query(
+            collection(db, "scholarshipApplications"),
+            where(field, "==", normalizedEmail),
+            limit(1),
+          ),
+        );
+    });
+  }
+
+  if (rawPhone) {
+    STUDENT_PHONE_FIELDS.forEach((field) => {
+      queries.push(
+        query(
+          collection(db, "scholarshipApplications"),
+          where(field, "==", rawPhone),
+          limit(1),
+        ),
+      );
+      if (digitsPhone !== rawPhone)
+        queries.push(
+          query(
+            collection(db, "scholarshipApplications"),
+            where(field, "==", digitsPhone),
+            limit(1),
+          ),
+        );
+    });
+  }
+
+  return queries;
+};
+
+const buildAttendanceSummary = (student, attendanceRecords = []) => {
+  const attendance = student?.attendance || {};
+  const tracks = [
+    ...new Set([...getStudentTracks(student), ...Object.keys(attendance)]),
+  ];
+  const recordCountsByTrack = attendanceRecords.reduce((counts, record) => {
+    const track = record.track;
+    if (!track) return counts;
+    counts[track] = (counts[track] || 0) + 1;
+    return counts;
+  }, {});
+  const markedSessions = student?.attendanceMarkedSessions || [];
+
+  return tracks.map((track) => {
+    const stats = attendance[track] || {};
+    const recordAttendedDays = recordCountsByTrack[track] || 0;
+    const storedAttendedDays = Number(stats.attendedDays || 0);
+    const storedLectureDays = Number(stats.lectureDays || 0);
+    const trackSlug = slugifyTrack(track);
+    const hasMarkedTrackAttendance =
+      recordAttendedDays > 0 ||
+      markedSessions.some((sessionId) =>
+        String(sessionId || "").startsWith(`${trackSlug}-`),
+      );
+    const attendedDays = hasMarkedTrackAttendance
+      ? Math.min(
+          storedAttendedDays || recordAttendedDays,
+          recordAttendedDays || storedAttendedDays,
+        )
+      : 0;
+    const lectureDays = hasMarkedTrackAttendance
+      ? Math.max(storedLectureDays, attendedDays)
+      : 0;
+
+    return {
+      track,
+      attendedDays,
+      lectureDays,
+      percentage: lectureDays
+        ? Math.round((attendedDays / lectureDays) * 100)
+        : 0,
+    };
+  });
+};
+
+const groupItemsByCourseAndSection = (items) =>
+  items.reduce((courses, item) => {
+    const courseName = item.course || "General Course";
+    const sectionName =
+      item.section || item.module || `Day ${item.unlockDay || 1}`;
+    if (!courses[courseName]) courses[courseName] = {};
+    if (!courses[courseName][sectionName])
+      courses[courseName][sectionName] = [];
+    courses[courseName][sectionName].push(item);
+    return courses;
+  }, {});
+
+const getLessonId = (lesson) => lesson.lessonId || lesson.id;
+
+
+const formatSessionDate = (dateKey) => {
+  if (!dateKey) return "Date pending";
+  const date = new Date(`${dateKey}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? dateKey
+    : date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+};
+
+const liveSessionMatchesStudent = (session, student) => {
+  if (session.isPublished === false) return false;
+  if (session.audienceType === "all") return true;
+  const modeMatches =
+    session.learningMode === "live"
+      ? isLiveClassStudent(student) || hasUnselectedLearningMethod(student)
+      : session.learningMode === "self-paced"
+        ? isSelfPacedStudent(student)
+        : true;
+  if (!modeMatches) return false;
+  if (!session.track || session.track === "all") return true;
+  return getStudentTracks(student).some((track) => normalize(track) === normalize(session.track));
+};
+const LmsDashboard = () => {
+  const navigate = useNavigate();
+  const playerRef = useRef(null);
+  const [student, setStudent] = useState(null);
+  const [login, setLogin] = useState({ email: "", whatsapp: "" });
+  const [lessons, setLessons] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [lmsSettings, setLmsSettings] = useState({});
+  const [completedLessonIds, setCompletedLessonIds] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [liveSessions, setLiveSessions] = useState([]);
+  const [activePanel, setActivePanel] = useState("overview");
+  const [isAttendanceHistoryOpen, setIsAttendanceHistoryOpen] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+  const [dataError, setDataError] = useState("");
+  const [certificateProfile, setCertificateProfile] = useState(null);
+  const [certificateForm, setCertificateForm] = useState({
+    displayName: "",
+    professionalEmail: "",
+    phone: "",
+    linkedin: "",
+    facebook: "",
+    instagram: "",
+    twitter: "",
+    tiktok: "",
+    photoUrl: "",
+    showInAlumniDirectory: true,
+  });
+  const [certificateLoading, setCertificateLoading] = useState(false);
+  const [certificateUploading, setCertificateUploading] = useState(false);
+  const [certificateError, setCertificateError] = useState("");
+  const [certificateSaveMessage, setCertificateSaveMessage] = useState("");
+  const [editingCertificate, setEditingCertificate] = useState(false);
+  const [alumniVisibilitySaving, setAlumniVisibilitySaving] = useState(false);
+  const [alumniVisibilityMessage, setAlumniVisibilityMessage] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) setStudent(JSON.parse(saved));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!student?.id) return;
+
+    const refreshStudent = async () => {
+      try {
+        const studentSnap = await getDoc(
+          doc(db, "scholarshipApplications", student.id),
+        );
+        if (!studentSnap.exists()) return;
+        const latestStudent = { id: studentSnap.id, ...studentSnap.data() };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(latestStudent));
+        setStudent(latestStudent);
+      } catch (error) {
+        console.error("Unable to refresh student profile:", error);
+      }
+    };
+
+    refreshStudent();
+  }, [student?.id]);
+
+  useEffect(() => {
+    if (!student?.id) return;
+
+    const loadCertificateProfile = async () => {
+      const profileRef = doc(
+        db,
+        CERTIFICATE_PROFILE_COLLECTION,
+        student.id,
+      );
+      // The LMS session is localStorage-based, so this ID must remain the
+      // scholarshipApplications document ID saved by the student login flow.
+      try {
+        const profileSnapshot = await getDoc(profileRef);
+        if (profileSnapshot.exists()) {
+          setCertificateProfile({
+            id: profileSnapshot.id,
+            ...profileSnapshot.data(),
+          });
+        } else {
+          setCertificateForm((current) => ({
+            ...current,
+            professionalEmail: current.professionalEmail || STUDENT_EMAIL_FIELDS.map((key) => student[key]).find(hasValue) || "",
+            phone: current.phone || STUDENT_PHONE_FIELDS.map((key) => student[key]).find(hasValue) || "",
+            showInAlumniDirectory: true,
+          }));
+        }
+      } catch (error) {
+        console.error("Unable to load certificate profile:", error);
+      }
+    };
+
+    loadCertificateProfile();
+  }, [student?.id]);
+
+  useEffect(() => {
+    if (!student?.id || !isInstructorLedStudent(student)) {
+      setAttendanceRecords([]);
+      return;
+    }
+
+    const fetchAttendanceRecords = async () => {
+      try {
+        const sessionSnapshot = await getDocs(
+          collection(db, "attendanceSessions"),
+        );
+        const allRecords = [];
+
+        for (const sessionDoc of sessionSnapshot.docs) {
+          const recordsSnapshot = await getDocs(
+            collection(db, "attendanceSessions", sessionDoc.id, "records"),
+          );
+
+          recordsSnapshot.docs.forEach((recordDoc) => {
+            const record = recordDoc.data();
+
+            if (record.studentId === student.id) {
+              allRecords.push({
+                id: recordDoc.id,
+                ...record,
+              });
+            }
+          });
+        }
+
+        setAttendanceRecords(
+          allRecords.sort((a, b) =>
+            String(b.dateKey || "").localeCompare(String(a.dateKey || "")),
+          ),
+        );
+      } catch (error) {
+        console.error("Unable to load attendance records:", error);
+        setAttendanceRecords([]);
+      }
+    };
+
+    fetchAttendanceRecords();
+  }, [student]);
+
+
+  useEffect(() => {
+    if (!student) return;
+
+    const fetchLiveSessions = async () => {
+      try {
+        const liveSnapshot = await getDocs(
+          query(collection(db, "liveSessions"), where("isPublished", "==", true)),
+        );
+        setLiveSessions(
+          liveSnapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))
+            .filter((session) => liveSessionMatchesStudent(session, student))
+            .sort((a, b) => String(b.sessionDate || "").localeCompare(String(a.sessionDate || ""))),
+        );
+      } catch (error) {
+        console.error("Unable to load live sessions:", error);
+        setLiveSessions([]);
+      }
+    };
+
+    fetchLiveSessions();
+  }, [student]);
+
+  useEffect(() => {
+    if (!student) return;
+    if (isLiveClassStudent(student) && !isSelfPacedStudent(student)) {
+      setLessons([]);
+      setResources([]);
+      setCompletedLessonIds([]);
+      setSelectedLessonId("");
+      setDataError("");
+      setLoading(false);
+      return;
+    }
+
+    const fetchLmsData = async () => {
+      setLoading(true);
+      setDataError("");
+      const curriculumGroup = resolveStudentCurriculumGroup(student);
+      const lessonQuery = query(
+        collection(db, LMS_CURRICULUM_COLLECTION),
+        where("isPublished", "==", true),
+        orderBy("globalOrder", "asc"),
+      );
+
+      const resourceQuery = getStudentResourceQuery(db);
+      const progressId = getProgressId(student);
+      const [
+        lessonSnapshot,
+        resourceSnapshot,
+        progressSnapshot,
+        legacyProgressSnapshot,
+        programmeSettingsSnapshot,
+        legacySettingsSnapshot,
+      ] = await Promise.all([
+        getDocs(lessonQuery),
+        getDocs(resourceQuery),
+        getDoc(doc(db, "progress", progressId)),
+        getDoc(doc(db, "studentProgress", progressId)),
+        getDoc(doc(db, "lmsSettings", "selfPacedStartDates")),
+        getDoc(doc(db, "lmsSettings", "selfPaced")),
+      ]);
+
+      let canonicalResourceSnapshot = resourceSnapshot;
+      if (import.meta.env.DEV) {
+        try {
+          const serverResourceSnapshot = await getDocsFromServer(resourceQuery);
+          const normalIds = new Set(resourceSnapshot.docs.map(({ id }) => id));
+          const serverIds = new Set(serverResourceSnapshot.docs.map(({ id }) => id));
+          console.info("Student resource cache/server diagnostic", {
+            normalQueryResourceCount: normalIds.size,
+            serverQueryResourceCount: serverIds.size,
+            normalButAbsentFromServer: [...normalIds].filter((id) => !serverIds.has(id)),
+          });
+          canonicalResourceSnapshot = serverResourceSnapshot;
+        } catch (error) {
+          console.warn("Student resource server diagnostic unavailable:", error);
+        }
+      }
+
+      const lessonData = curriculumGroup
+        ? filterItemsForCurriculumGroup(
+            snapshotItems(lessonSnapshot, LMS_CURRICULUM_COLLECTION)
+              .filter(isCurriculumLesson)
+              .map((item) => ({ ...item, type: "video" })),
+            curriculumGroup,
+          )
+        : [];
+      const resourceData = curriculumGroup
+        ? filterItemsForCurriculumGroup(
+            snapshotItems(canonicalResourceSnapshot, LMS_RESOURCE_COLLECTION)
+              .map((item) => ({ ...item, type: "resource" })),
+            curriculumGroup,
+          )
+        : [];
+      if (import.meta.env.DEV) {
+        console.info("STUDENT RESOURCE IDS", resourceData.map(({ id }) => id));
+        console.table(getResourceDebugRows(resourceData));
+      }
+      const progress = progressSnapshot.exists()
+        ? progressSnapshot.data()
+        : legacyProgressSnapshot.exists()
+          ? legacyProgressSnapshot.data()
+          : {};
+      const settings = {
+        ...(legacySettingsSnapshot.exists()
+          ? legacySettingsSnapshot.data()
+          : {}),
+        startDates: programmeSettingsSnapshot.exists()
+          ? programmeSettingsSnapshot.data()
+          : {},
+      };
+      const sortedLessons = sortLmsItems(lessonData);
+      const firstUnlockedLesson = sortedLessons.find((item) =>
+        isItemUnlocked(item, student, new Date(), settings, curriculumGroup),
+      );
+
+      setLmsSettings(settings);
+      setLessons(lessonData);
+      setResources(resourceData);
+      setCompletedLessonIds(progress.completedLessonIds || []);
+      const savedLesson = lessonData.find(
+        (lesson) => getLessonId(lesson) === progress.lastWatchedLessonId,
+      );
+      const savedLessonIsUnlocked = savedLesson
+        ? isItemUnlocked(
+            savedLesson,
+            student,
+            new Date(),
+            settings,
+            curriculumGroup,
+          )
+        : false;
+
+      setSelectedLessonId(
+        savedLessonIsUnlocked
+          ? progress.lastWatchedLessonId
+          : firstUnlockedLesson
+            ? getLessonId(firstUnlockedLesson)
+            : "",
+      );
+      setLoading(false);
+    };
+
+    fetchLmsData().catch((error) => {
+      console.error(error);
+      setDataError(
+        "Unable to load LMS curriculum right now. Please refresh or contact support.",
+      );
+      setLoading(false);
+    });
+  }, [student]);
+
+  const items = useMemo(
+    () => sortLmsItems([...resources, ...lessons]),
+    [lessons, resources],
+  );
+  const groupedItems = useMemo(
+    () => groupItemsByCourseAndSection(items),
+    [items],
+  );
+  const selectedLesson = lessons.find(
+    (lesson) => getLessonId(lesson) === selectedLessonId,
+  );
+  const curriculumGroup = resolveStudentCurriculumGroup(student);
+  const programDay = getStudentProgramDay(
+    student,
+    new Date(),
+    lmsSettings,
+    curriculumGroup,
+  );
+  const progressPercentage = calculateProgressPercentage(
+    completedLessonIds,
+    lessons,
+  );
+  const nextLesson = lessons.find(
+    (lesson) =>
+      isItemUnlocked(
+        lesson,
+        student,
+        new Date(),
+        lmsSettings,
+        curriculumGroup,
+      ) &&
+      !completedLessonIds.includes(getLessonId(lesson)),
+  );
+  const courseName = getStudentCourse(student) || "Your Course";
+  const isLiveOnlyStudent =
+    isInstructorLedStudent(student) && !isSelfPacedStudent(student);
+  const attendanceSummary = buildAttendanceSummary(student, attendanceRecords);
+  const primaryAttendance = attendanceSummary[0] || {
+    track: courseName,
+    attendedDays: 0,
+    lectureDays: 0,
+    percentage: 0,
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setAuthError("");
+    setLoading(true);
+
+    try {
+      if (!login.email.trim() && !normalizePhone(login.whatsapp)) {
+        setAuthError(
+          "Enter your enrollment email or WhatsApp/phone number to continue.",
+        );
+        return;
+      }
+
+      const snapshots = await Promise.all(
+        buildLoginQueries(login).map((loginQuery) => getDocs(loginQuery)),
+      );
+      const match = findEligibleStudent(uniqueDocs(snapshots), login);
+
+      if (!match) {
+        setAuthError(
+          "No enrolled student was found with that email or WhatsApp/phone number.",
+        );
+        return;
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(match));
+      setStudent(match);
+      navigate("/lms", { replace: true });
+    } catch (error) {
+      console.error(error);
+      setAuthError("Unable to sign in right now. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleComplete = async (lesson) => {
+    const lessonId = getLessonId(lesson);
+    const updatedCompleted = [...new Set([...completedLessonIds, lessonId])];
+    setCompletedLessonIds(updatedCompleted);
+    await saveStudentProgress({
+      db,
+      student,
+      completedLessonIds: updatedCompleted,
+      lastWatchedLessonId: lessonId,
+      lessons,
+    });
+  };
+
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setCertificateProfile(null);
+    setStudent(null);
+    navigate("/lms", { replace: true });
+  };
+
+  const handleCertificateField = (event) => {
+    const { checked, name, type, value } = event.target;
+    setCertificateForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const handleCertificatePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setCertificateError("Please choose a JPG, JPEG, PNG, or WEBP image.");
+      event.target.value = "";
+      return;
+    }
+
+    setCertificateUploading(true);
+    setCertificateError("");
+    try {
+      const photoUrl = await uploadImageToCloudinary(file);
+      setCertificateForm((current) => ({ ...current, photoUrl }));
+    } catch (error) {
+      setCertificateError(error.message || "Unable to upload this photo.");
+    } finally {
+      setCertificateUploading(false);
+    }
+  };
+
+  const handleCertificateSubmit = async (event) => {
+    event.preventDefault();
+    if (!certificateForm.displayName.trim() || !certificateForm.photoUrl) return;
+
+    setCertificateLoading(true);
+    setCertificateError("");
+    setCertificateSaveMessage("Saving alumni profile...");
+    const isResubmission = certificateProfile?.status === "Changes Requested";
+    const profile = {
+      studentId: student.id,
+      course: student.course || student.courseName || student.program || courseName,
+      track: student.track || courseName,
+      photoUrl: certificateForm.photoUrl,
+      displayName: certificateForm.displayName.trim(),
+      professionalEmail: certificateForm.professionalEmail.trim(),
+      phone: certificateForm.phone.trim(),
+      linkedin: certificateForm.linkedin.trim(),
+      facebook: certificateForm.facebook.trim(),
+      instagram: certificateForm.instagram.trim(),
+      twitter: certificateForm.twitter.trim(),
+      tiktok: certificateForm.tiktok.trim(),
+      showInAlumniDirectory: certificateForm.showInAlumniDirectory === true,
+      status: "Pending",
+      updatedAt: serverTimestamp(),
+      adminMessage: null,
+    };
+
+    try {
+      const profileRef = doc(
+        db,
+        CERTIFICATE_PROFILE_COLLECTION,
+        student.id,
+      );
+      if (isResubmission) {
+        await setDoc(profileRef, profile, { merge: true });
+        setCertificateProfile((current) => ({ ...current, ...profile }));
+      } else {
+        const newProfile = { ...profile, submittedAt: serverTimestamp() };
+        await setDoc(profileRef, newProfile);
+        setCertificateProfile(newProfile);
+      }
+      setEditingCertificate(false);
+      setCertificateSaveMessage("Your certificate application and alumni profile preferences were saved.");
+    } catch (error) {
+      console.error("Unable to submit certificate application:", error);
+      setCertificateError("Unable to submit your application. Please try again.");
+      setCertificateSaveMessage("");
+    } finally {
+      setCertificateLoading(false);
+    }
+  };
+
+  const editCertificateProfile = () => {
+    setCertificateForm({
+      displayName: certificateProfile.displayName || "",
+      professionalEmail: certificateProfile.professionalEmail || certificateProfile.email || "",
+      phone: certificateProfile.phone || certificateProfile.whatsapp || "",
+      linkedin: certificateProfile.linkedin || "", facebook: certificateProfile.facebook || "",
+      instagram: certificateProfile.instagram || "", twitter: certificateProfile.twitter || "",
+      tiktok: certificateProfile.tiktok || "", photoUrl: certificateProfile.photoUrl || "",
+      showInAlumniDirectory: certificateProfile.showInAlumniDirectory !== false,
+    });
+    setCertificateError("");
+    setEditingCertificate(true);
+  };
+
+  const updateAlumniVisibility = async (event) => {
+    const consent = event.target.checked;
+    if (certificateProfile?.status !== "Approved" || !certificateProfile.certificateId) return;
+    const previousConsent = certificateProfile.showInAlumniDirectory === true;
+    setAlumniVisibilitySaving(true);
+    setCertificateProfile((current) => ({ ...current, showInAlumniDirectory: consent }));
+    setAlumniVisibilityMessage("Saving alumni profile...");
+    const profileRef = doc(db, CERTIFICATE_PROFILE_COLLECTION, student.id);
+    const alumniRef = publicAlumniRef(certificateProfile.certificateId);
+    try {
+      const batch = writeBatch(db);
+      batch.update(profileRef, { showInAlumniDirectory: consent, updatedAt: serverTimestamp() });
+      if (consent) batch.set(alumniRef, createPublicAlumniRecord({ profile: certificateProfile, certificateId: certificateProfile.certificateId }));
+      else batch.delete(alumniRef);
+      await batch.commit();
+      setAlumniVisibilityMessage("Your alumni directory visibility has been updated.");
+    } catch (error) {
+      console.error("Unable to update alumni directory visibility:", error);
+      setCertificateProfile((current) => ({ ...current, showInAlumniDirectory: previousConsent }));
+      setAlumniVisibilityMessage("We could not update your alumni directory visibility. Please try again.");
+    } finally { setAlumniVisibilitySaving(false); }
+  };
+
+  if (!student) {
+    return (
+      <main className="lms-page">
+        <Navbar />
+        <section className="lms-login-shell">
+          <div className="lms-login-visual" aria-hidden="true">
+            <div className="lms-orb lms-orb-one" />
+            <div className="lms-orb lms-orb-two" />
+            <div className="lms-preview-card lms-preview-main">
+              <span>Learning path</span>
+              <strong>Professional tech skills</strong>
+              <p>
+                Access lessons, resources, attendance updates, and program
+                guidance in one secure portal.
+              </p>
+            </div>
+            <div className="lms-preview-card lms-preview-small">
+              <strong>92%</strong>
+              <span>Career-ready curriculum</span>
+            </div>
+          </div>
+          <div className="lms-login-card">
+            <span>Student Portal</span>
+            <h1>Welcome back to OVTech Academy</h1>
+            <p>
+              Sign in with the email address or WhatsApp/phone number used for
+              enrollment to continue your learning journey.
+            </p>
+            <form onSubmit={handleLogin}>
+              <label>
+                Email address
+                <input
+                  type="email"
+                  value={login.email}
+                  onChange={(e) =>
+                    setLogin((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                WhatsApp/phone number
+                <input
+                  type="tel"
+                  value={login.whatsapp}
+                  onChange={(e) =>
+                    setLogin((prev) => ({ ...prev, whatsapp: e.target.value }))
+                  }
+                />
+              </label>
+              {authError && <p className="lms-error">{authError}</p>}
+              <button type="submit" disabled={loading}>
+                {loading ? "Checking..." : "Enter LMS"}
+              </button>
+            </form>
+            <div className="lms-login-support">
+              <strong>Need help?</strong>
+              <span>
+                Contact support if your enrollment details have changed.
+              </span>
+            </div>
+          </div>
+        </section>
+        <Footer />
+      </main>
+    );
+  }
+
+  return (
+    <main className="lms-page">
+      <Navbar />
+      <section className="lms-portal-shell">
+        <aside className="lms-sidebar">
+          <div className="lms-sidebar-profile"><span>Student Dashboard</span><strong>{getStudentName(student)}</strong><small>{courseName}</small></div>
+          <button className={activePanel === "overview" ? "active" : ""} onClick={() => setActivePanel("overview")}>Overview</button>
+          <button className={activePanel === "live" ? "active" : ""} onClick={() => setActivePanel("live")}>See live sessions</button>
+          {!isLiveOnlyStudent && <button className={activePanel === "lessons" ? "active" : ""} onClick={() => setActivePanel("lessons")}>Curriculum</button>}
+          <button onClick={() => setIsAttendanceHistoryOpen(true)}>Attendance history</button>
+          <button className={activePanel === "certificate" ? "active" : ""} onClick={() => setActivePanel("certificate")}>Certificate</button>
+          <button className="lms-sidebar-logout" onClick={logout}>Logout</button>
+        </aside>
+        <div className="lms-main-panel">
+      <section className="lms-hero">
+        <div>
+          <span>Welcome back, {getStudentName(student)}</span>
+          <h1>{courseName}</h1>
+          <p>
+            Package: {getEnrollmentPackage(student) || "OVTech Program"}
+            {!isLiveOnlyStudent && ` • Day ${programDay}`}
+          </p>
+        </div>
+        <button onClick={logout}>Logout</button>
+      </section>
+      {activePanel === "certificate" && (
+        <section className="certificate-page">
+          {certificateProfile?.status === "Approved" && !editingCertificate ? (<>
+            <Certificate
+              profile={certificateProfile}
+              studentName={getStudentName(student)}
+              courseName={courseName}
+              durationWeeks={student?.durationWeeks}
+            />
+            <section className="alumni-visibility" aria-labelledby="alumni-visibility-title">
+              <div><span>Public graduate profile</span><h2 id="alumni-visibility-title">Alumni Directory Visibility</h2><strong>{certificateProfile.showInAlumniDirectory === true ? "Listed publicly" : "Not listed publicly"}</strong></div>
+              <label><input type="checkbox" checked={certificateProfile.showInAlumniDirectory === true} onChange={updateAlumniVisibility} disabled={alumniVisibilitySaving} /> Show my profile in the OVTech Academy Alumni Directory.</label>
+              <p>Your name, professional photo, course, completion date and selected professional links may be displayed publicly. You can withdraw this permission later.</p>
+              {alumniVisibilityMessage && <p className={alumniVisibilitySaving ? "alumni-saving" : ""} role="status">{alumniVisibilitySaving && <span className="alumni-spinner" aria-hidden="true" />}{alumniVisibilityMessage}</p>}
+            </section>
+          </>
+          ) : certificateProfile?.status === "Revoked" && !editingCertificate ? (
+            <div className="certificate-status-card certificate-revoked-card">
+              <span>Certificate Status</span>
+              <h2>Certificate Revoked</h2>
+              <p className="certificate-status-lead">This certificate is no longer active.</p>
+              <div className="certificate-admin-message"><span>Reason:</span><p>{certificateProfile.revocationReason}</p></div>
+              <p>Please contact OVTech Academy if you believe this was done in error or once the outstanding requirement has been resolved.</p>
+            </div>
+          ) : certificateProfile && !editingCertificate ? (
+            <div className="certificate-status-card">
+              <div className="certificate-status-icon" aria-hidden="true">✓</div>
+              <span>Certificate Status</span>
+              {certificateProfile.status === "Changes Requested" ? <>
+                <h2>Changes Required</h2>
+                <p className="certificate-status-lead">Your administrator needs you to update your certificate profile.</p>
+                <div className="certificate-admin-message"><span>Message from admin</span><p>{certificateProfile.adminMessage}</p></div>
+                <button className="certificate-update-button" type="button" onClick={editCertificateProfile}>Update Certificate Profile</button>
+              </> : <>
+                <h2>Pending Review</h2>
+                <p className="certificate-status-lead">Your certificate application has been received.</p>
+                <p>Your instructor/admin will review your course completion, attendance and project status before approving your certificate.</p>
+                <strong>Please check back later.</strong>
+              </>}
+            </div>
+          ) : (
+            <>
+              <header className="certificate-heading">
+                <span>Student credentials</span>
+                <h1>Certificate Application</h1>
+                <p>Complete your certificate profile. Your information will be reviewed before a certificate can be issued.</p>
+              </header>
+              <form className="certificate-form" onSubmit={handleCertificateSubmit}>
+                <div className="certificate-photo-field">
+                  <div className="certificate-photo-preview">
+                    {certificateForm.photoUrl ? <img src={certificateForm.photoUrl} alt="Your professional profile" /> : <span aria-hidden="true">+</span>}
+                  </div>
+                  <div>
+                    <label htmlFor="certificate-photo">Professional Photo <em>Required</em></label>
+                    <p>Upload a clear, professional headshot in JPG, JPEG, PNG, or WEBP format.</p>
+                    <label className="certificate-upload-button" htmlFor="certificate-photo">{certificateUploading ? "Uploading..." : certificateForm.photoUrl ? "Change photo" : "Upload photo"}</label>
+                    <input id="certificate-photo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={handleCertificatePhoto} disabled={certificateUploading} />
+                  </div>
+                </div>
+                <div className="certificate-field certificate-field-wide">
+                  <label htmlFor="certificate-name">Full Name <em>Required</em></label>
+                  <input id="certificate-name" name="displayName" value={certificateForm.displayName} onChange={handleCertificateField} placeholder="Enter your full name exactly as you want it to appear on your certificate." required />
+                </div>
+                <div className="certificate-field certificate-field-wide">
+                  <p><strong>Only the contact details you provide here may appear on your public alumni profile.</strong></p>
+                  <label htmlFor="certificate-email">Professional Email</label>
+                  <input id="certificate-email" name="professionalEmail" type="email" value={certificateForm.professionalEmail} onChange={handleCertificateField} placeholder="Enter the email you would like displayed publicly." />
+                  <small>We recommend using a professional email address if you intend to share your certificate with employers.</small>
+                </div>
+                <div className="certificate-field certificate-field-wide">
+                  <label htmlFor="certificate-phone">Professional Phone</label>
+                  <input id="certificate-phone" name="phone" type="tel" value={certificateForm.phone} onChange={handleCertificateField} placeholder="Enter the phone number you would like displayed publicly." />
+                </div>
+                {["LinkedIn", "Facebook", "Instagram", "X (Twitter)", "TikTok"].map((label) => {
+                  const name = label === "X (Twitter)" ? "twitter" : label.toLowerCase();
+                  return <div className="certificate-field" key={name}><label htmlFor={`certificate-${name}`}>{label}</label><input id={`certificate-${name}`} name={name} type="url" value={certificateForm[name]} onChange={handleCertificateField} placeholder={`https://${name === "twitter" ? "x.com" : `${name}.com`}/yourprofile`} /></div>;
+                })}
+                <div className="certificate-consent certificate-field-wide">
+                  <label><input type="checkbox" name="showInAlumniDirectory" checked={certificateForm.showInAlumniDirectory} onChange={handleCertificateField} disabled={certificateLoading} /> Display my graduate profile in the OVTech Academy Alumni Directory.</label>
+                  <p>Your name, professional photo, course, completion date and selected professional links may be displayed publicly. You can withdraw this permission later.</p>
+                </div>
+                {certificateError && <p className="certificate-error certificate-field-wide" role="alert">{certificateError}</p>}
+                {certificateSaveMessage && <p className="certificate-field-wide" role="status">{certificateSaveMessage}</p>}
+                <div className="certificate-actions certificate-field-wide">
+                  <button type="submit" disabled={!certificateForm.displayName.trim() || !certificateForm.photoUrl || certificateUploading || certificateLoading}>{certificateLoading ? "Saving alumni profile..." : editingCertificate ? "Resubmit for review" : "Submit application"}</button>
+                  <small>Only your photo and full name are required.</small>
+                </div>
+              </form>
+            </>
+          )}
+        </section>
+      )}
+      {activePanel === "live" && (
+        <section className="lms-live-sessions">
+          <div className="lms-section-title"><span>Watch live sessions</span><h2>Published sessions for you</h2></div>
+          {liveSessions.length ? liveSessions.map((session) => (
+            <article className="lms-live-card" key={session.id}>
+              <div><span>{formatSessionDate(session.sessionDate)}</span><h3>{session.title}</h3></div>
+              {getSafeYouTubeEmbedUrl(session.youtubeUrl) ? <iframe src={getSafeYouTubeEmbedUrl(session.youtubeUrl)} title={session.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /> : <a href={session.youtubeUrl} target="_blank" rel="noreferrer">Open live session</a>}
+              {session.attachmentUrl && <a className="lms-download-link" href={session.attachmentUrl} download={session.attachmentName || undefined} target="_blank" rel="noreferrer">Download attached file{session.attachmentName ? `: ${session.attachmentName}` : ""}</a>}
+            </article>
+          )) : <p className="lms-empty-state">No live sessions have been published for your program yet.</p>}
+        </section>
+      )}
+      {activePanel === "overview" && (isLiveOnlyStudent ? (
+        <section className="lms-progress-card lms-attendance-card">
+          <div className="lms-attendance-header">
+            <div>
+              <span>Live class attendance</span>
+              <strong>{primaryAttendance.percentage}% attendance</strong>
+              <p>
+                {primaryAttendance.attendedDays} of{" "}
+                {primaryAttendance.lectureDays} lecture
+                {primaryAttendance.lectureDays === 1 ? "" : "s"} attended for{" "}
+                {primaryAttendance.track}.
+              </p>
+            </div>
+            <div className="lms-attendance-score">
+              <strong>{primaryAttendance.attendedDays}</strong>
+              <span>Days Present</span>
+            </div>
+          </div>
+          <div className="lms-progress">
+            <span style={{ width: `${primaryAttendance.percentage}%` }} />
+          </div>
+          <div className="lms-attendance-grid">
+            {attendanceSummary.map((item) => (
+              <article key={item.track}>
+                <strong>{item.track}</strong>
+                <p>
+                  {item.attendedDays} / {item.lectureDays} lectures attended
+                </p>
+                <small>{item.percentage}% attendance rate</small>
+              </article>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="lms-attendance-history-card"
+            onClick={() => setIsAttendanceHistoryOpen(true)}
+          >
+            <span>Attendance history</span>
+            <strong>View all marked class days</strong>
+            <p>
+              {attendanceRecords.length
+                ? `${attendanceRecords.length} attendance ${
+                    attendanceRecords.length === 1 ? "record" : "records"
+                  } available`
+                : "Your marked class days will appear here after attendance is submitted."}
+            </p>
+          </button>
+        </section>
+      ) : (
+        <section className="lms-progress-card">
+          <div>
+            <strong>{progressPercentage}% complete</strong>
+            <p>
+              Next lesson:{" "}
+              {lessons.length
+                ? nextLesson?.title || "You are caught up."
+                : "No lessons available yet."}
+            </p>
+          </div>
+          <div className="lms-progress">
+            <span style={{ width: `${progressPercentage}%` }} />
+          </div>
+        </section>
+      ))}
+      {isAttendanceHistoryOpen && (
+        <div
+          className="lms-attendance-modal-overlay"
+          role="presentation"
+          onClick={() => setIsAttendanceHistoryOpen(false)}
+        >
+          <section
+            className="lms-attendance-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attendance-history-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="lms-attendance-modal-header">
+              <div>
+                <span>Attendance history</span>
+                <h2 id="attendance-history-title">All marked class days</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Close attendance history"
+                onClick={() => setIsAttendanceHistoryOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="lms-attendance-history-list">
+              {attendanceRecords.length ? (
+                attendanceRecords.map((record) => (
+                  <div key={`${record.sessionId}-${record.id}`}>
+                    <span>{formatAttendanceDate(record.dateKey)}</span>
+                    <strong>{record.track || primaryAttendance.track}</strong>
+                    <em>Present</em>
+                  </div>
+                ))
+              ) : (
+                <p>
+                  Your marked class days will appear here after attendance is
+                  submitted.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+      {dataError && <section className="lms-alert">{dataError}</section>}
+      {activePanel === "lessons" && !isLiveOnlyStudent && (
+        <section className="lms-layout">
+          <aside className="lms-list">
+            <h2>Courses & sections</h2>
+            {items.length ? (
+              Object.entries(groupedItems).map(([course, sections]) => (
+                <div className="lms-course-group" key={course}>
+                <h3>{course}</h3>
+                {Object.entries(sections).map(([section, sectionItems]) => (
+                  <div
+                    className="lms-section-group"
+                    key={`${course}-${section}`}
+                  >
+                    <h4>{section}</h4>
+                    {sectionItems.map((item) => {
+                      const unlocked = isItemUnlocked(
+                        item,
+                        student,
+                        new Date(),
+                        lmsSettings,
+                        curriculumGroup,
+                      );
+                      const lessonId = getLessonId(item);
+                      const complete =
+                        item.type === "video" &&
+                        completedLessonIds.includes(lessonId);
+                      return (
+                        <button
+                          key={item.id || lessonId || item.resourceId}
+                          className={
+                            selectedLessonId === lessonId ? "active" : ""
+                          }
+                          disabled={!unlocked}
+                          onClick={() => {
+                            if (item.type === "video" && unlocked) {
+                              setSelectedLessonId(lessonId);
+                              window.setTimeout(() => {
+                                playerRef.current?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                });
+                              }, 0);
+                            }
+                          }}
+                        >
+                          <span>
+                            {item.type === "resource"
+                              ? unlocked
+                                ? "📎 Resource"
+                                : "🔒 Locked resource"
+                              : complete
+                                ? "✅ Completed"
+                                : unlocked
+                                  ? "▶ Lesson"
+                                  : "🔒 Locked lesson"}
+                          </span>
+                          <strong>{item.title || item.fileName}</strong>
+                          <small>
+                            {item.fileType || "Video"} • Day{" "}
+                            {item.unlockDay || 1}
+                          </small>
+                          {item.type === "resource" &&
+                            unlocked &&
+                            (() => {
+                              const action = getResourceAction(item);
+                              return action.href ? (
+                                <a
+                                  href={action.href}
+                                  download={action.href.startsWith("/lms-resources/") ? "" : undefined}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {action.label}
+                                </a>
+                              ) : (
+                                <em>{action.label}</em>
+                              );
+                            })()}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+                </div>
+              ))
+            ) : (
+              <p className="lms-empty-state">
+                No curriculum has been published for your track yet. Please
+                check back later.
+              </p>
+            )}
+          </aside>
+          <section className="lms-player-card" ref={playerRef}>
+            {selectedLesson ? (
+              <>
+                <h2>{selectedLesson.title}</h2>
+                {getSafeYouTubeEmbedUrl(selectedLesson.youtubeUrl) ? (
+                  <iframe
+                    src={getSafeYouTubeEmbedUrl(selectedLesson.youtubeUrl)}
+                    title={selectedLesson.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
+                  <p className="lms-error">
+                    This lesson needs a valid YouTube URL.
+                  </p>
+                )}
+                <button
+                  onClick={() => handleComplete(selectedLesson)}
+                  disabled={completedLessonIds.includes(
+                    getLessonId(selectedLesson),
+                  )}
+                >
+                  {completedLessonIds.includes(getLessonId(selectedLesson))
+                    ? "Completed"
+                    : "Mark lesson as completed"}
+                </button>
+              </>
+            ) : (
+              <p>
+                {lessons.length
+                  ? "Select an unlocked lesson to start watching."
+                  : "No lessons available yet."}
+              </p>
+            )}
+          </section>
+        </section>
+      )}
+        </div>
+      </section>
+      <Footer />
+    </main>
+  );
+};
+
+export default LmsDashboard;
