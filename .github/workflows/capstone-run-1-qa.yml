@@ -1,0 +1,39 @@
+name: Capstone Run 1 QA
+on:
+  push:
+    branches: [capstone-run-1]
+permissions:
+  contents: write
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout capstone
+        uses: actions/checkout@v4
+        with:
+          ref: capstone-run-1
+          fetch-depth: 0
+      - name: Restore baseline binary assets from source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/DavidOneVoice/ovtechacademy.git /tmp/ovtech-source
+          cd /tmp/ovtech-source
+          git fetch --depth 1 origin 17ef9191e1ce3b605e7276d34f7233502fda3df9
+          git checkout 17ef9191e1ce3b605e7276d34f7233502fda3df9
+          cd "$GITHUB_WORKSPACE"
+          rsync -a --ignore-existing --exclude='.git/' --exclude='.env' --exclude='.env.*' --exclude='node_modules/' /tmp/ovtech-source/ ./
+          if ! git diff --quiet -- .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public data src/assets
+            git commit -m "Restore source binary assets for isolated capstone baseline [skip ci]"
+            git push origin HEAD:capstone-run-1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
