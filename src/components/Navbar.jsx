@@ -47,7 +47,7 @@ const Navbar = () => {
       </button>
 
       {mobileMenuOpen && (
-        <div className="ov-mobile-menu-overlay">
+        <div className="ov-mobile-menu-overlay" role="dialog" aria-modal="true" aria-label="Site navigation">
           <div className="ov-mobile-menu">
             <button
               className="ov-mobile-close"
