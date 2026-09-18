@@ -1,11 +1,31 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import "./Navbar.css";
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuButtonRef = useRef(null);
+  const wasMobileMenuOpen = useRef(false);
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  useEffect(() => {
+    if (!mobileMenuOpen && wasMobileMenuOpen.current) {
+      menuButtonRef.current?.focus();
+    }
+    wasMobileMenuOpen.current = mobileMenuOpen;
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") closeMobileMenu();
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [mobileMenuOpen]);
 
   return (
     <nav className="ov-navbar">
@@ -39,16 +59,19 @@ const Navbar = () => {
       </a>
 
       <button
+        ref={menuButtonRef}
         className="ov-menu-btn"
         onClick={() => setMobileMenuOpen(true)}
         aria-label="Open menu"
+        aria-expanded={mobileMenuOpen}
+        aria-controls="ov-mobile-navigation"
       >
         ☰
       </button>
 
       {mobileMenuOpen && (
-        <div className="ov-mobile-menu-overlay" role="dialog" aria-modal="true" aria-label="Site navigation">
-          <div className="ov-mobile-menu">
+        <div className="ov-mobile-menu-overlay" onClick={closeMobileMenu}>
+          <nav id="ov-mobile-navigation" className="ov-mobile-menu" aria-label="Mobile navigation" onClick={(event) => event.stopPropagation()}>
             <button
               className="ov-mobile-close"
               onClick={closeMobileMenu}
@@ -89,7 +112,7 @@ const Navbar = () => {
             >
               Apply for Scholarship
             </a>
-          </div>
+          </nav>
         </div>
       )}
     </nav>

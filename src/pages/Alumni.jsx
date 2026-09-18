@@ -67,6 +67,9 @@ export default function Alumni() {
       "content",
       "Meet verified OVTech Academy graduates who consented to share their professional profiles and completed programmes.",
     );
+    // Entering the route intentionally starts the first paginated service
+    // request; the same loader is also reused by the explicit Load More action.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAlumni();
     return () => {
       if (meta && previous) meta.setAttribute("content", previous);

@@ -72,6 +72,9 @@ const AdminLiveSessions = () => {
   };
 
   useEffect(() => {
+    // The effect intentionally starts the initial Firestore synchronization;
+    // the loader owns the loading state for both initial and manual refreshes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLiveSessions().catch((error) => {
       console.error("Live session management load error:", error);
       showToast("Unable to load live sessions.");

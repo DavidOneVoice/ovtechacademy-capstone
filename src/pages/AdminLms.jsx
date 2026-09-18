@@ -141,6 +141,9 @@ const AdminLms = () => {
   };
 
   useEffect(() => {
+    // A curriculum-group change intentionally starts a Firestore reload; the
+    // shared loader owns loading state for this effect and later admin actions.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLmsContent(selectedGroup).catch((error) => {
       console.error("LMS management load error:", error);
       showToast("Unable to load LMS content.");

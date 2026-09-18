@@ -77,7 +77,12 @@ const GraduatedStudents = () => {
     }
   }, []);
 
-  useEffect(() => { loadGraduates(); }, [loadGraduates]);
+  useEffect(() => {
+    // Entering this protected route intentionally starts its Firestore join;
+    // the callback is also reused by the user-visible Retry control.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadGraduates();
+  }, [loadGraduates]);
 
   const courseOptions = useMemo(() => [...new Set(graduates.map((graduate) => normalizeProgrammeName(getCourse(graduate))).filter(Boolean))].sort(), [graduates]);
   const methodOptions = useMemo(() => [...new Set(graduates.map(getMethod).filter(Boolean))].sort(), [graduates]);

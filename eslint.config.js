@@ -17,10 +17,22 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+  },
+  {
+    files: ['src/components/ProtectedAdminRoute.jsx'],
     rules: {
-      // These effects intentionally initialize state from browser storage or
-      // synchronize it with Firestore. The compiler-oriented rule reports
-      // those established integration effects as errors.
+      // This existing route guard intentionally synchronizes external Firebase
+      // and localStorage authentication state. Authentication is out of scope
+      // for Run 2, so the exception is restricted to this unchanged file.
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
+    files: ['src/pages/LmsDashboard.jsx'],
+    rules: {
+      // This existing LMS intentionally hydrates a localStorage session and
+      // clears prior-student data when identity or learning mode changes. The
+      // exception is isolated here so those out-of-scope flows stay unchanged.
       'react-hooks/set-state-in-effect': 'off',
     },
   },

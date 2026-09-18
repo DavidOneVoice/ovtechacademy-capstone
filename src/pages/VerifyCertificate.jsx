@@ -11,6 +11,9 @@ export default function VerifyCertificate() {
 
   useEffect(() => {
     let active = true;
+    // A changed route parameter represents a new lookup and must clear the
+    // previous certificate before the asynchronous public query completes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResult({ kind: "loading" });
     getPublicCertificate(certificateId).then((next) => active && setResult(next)).catch((error) => {
       if (import.meta.env.DEV) console.error("Certificate verification failed", error);
