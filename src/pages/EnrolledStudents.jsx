@@ -494,7 +494,7 @@ const EnrolledStudents = () => {
       {attendanceModalOpen && (
         <div className="admin-modal-overlay">
           <div className="admin-modal admin-attendance-modal">
-            <button className="admin-modal-close" onClick={() => setAttendanceModalOpen(false)}>×</button>
+            <button type="button" className="admin-modal-close" aria-label="Close attendance link dialog" onClick={() => setAttendanceModalOpen(false)}>×</button>
             <h2>Generate Attendance Link</h2>
             <p className="admin-modal-email">Choose the exact course holding today. Each course gets its own daily link.</p>
             <div className="admin-attendance-course-grid">
@@ -508,7 +508,7 @@ const EnrolledStudents = () => {
             {generatedSession && (
               <div className="admin-generated-link">
                 <span>{generatedSession.track} • {generatedSession.dateKey}</span>
-                <input readOnly value={generatedSession.link} onFocus={(event) => event.target.select()} />
+                <input aria-label="Generated attendance link" readOnly value={generatedSession.link} onFocus={(event) => event.target.select()} />
                 <button type="button" onClick={() => copyAttendanceLink(generatedSession.link)}>Copy Link</button>
                 {generatedSession.reused && <p>This lecture was already confirmed today, so the existing link was reused.</p>}
               </div>
@@ -535,7 +535,7 @@ const EnrolledStudents = () => {
       {selectedStudent && (
         <div className="admin-modal-overlay">
           <div className="admin-modal">
-            <button className="admin-modal-close" onClick={() => setSelectedStudent(null)}>×</button>
+            <button type="button" className="admin-modal-close" aria-label="Close student details" onClick={() => setSelectedStudent(null)}>×</button>
             <h2>{selectedStudent.fullName}</h2>
             <p className="admin-modal-email">{selectedStudent.email}</p>
             <div className="admin-details-grid">
@@ -625,7 +625,7 @@ const EnrolledStudents = () => {
       {editingStudent && (
         <div className="admin-modal-overlay">
           <div className="admin-modal admin-edit-modal">
-            <button className="admin-modal-close" onClick={() => setEditingStudent(null)}>×</button>
+            <button type="button" className="admin-modal-close" aria-label="Close student editor" onClick={() => setEditingStudent(null)}>×</button>
             <h2>Edit Student Details</h2>
             <p className="admin-modal-email">Changes update the student's main application record.</p>
             <form onSubmit={saveStudentDetails} className="admin-edit-form">

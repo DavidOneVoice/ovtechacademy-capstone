@@ -571,7 +571,7 @@ const Home = () => {
         </div>
       </section>
       {showBackToTop && (
-        <button className="ov-back-top" onClick={scrollToTop}>
+        <button className="ov-back-top" onClick={scrollToTop} aria-label="Back to top">
           <NorthIcon style={{ fontSize: "2rem", color: "#fff" }} />
         </button>
       )}
@@ -581,6 +581,7 @@ const Home = () => {
         target="_blank"
         rel="noreferrer noopener"
         className="ov-whatsapp-float"
+        aria-label="Chat with OVTech Academy on WhatsApp"
       >
         <WhatsAppIcon style={{ fontSize: "2rem", color: "#fff" }} />
       </a>

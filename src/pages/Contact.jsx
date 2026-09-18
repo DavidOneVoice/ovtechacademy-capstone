@@ -146,8 +146,10 @@ ${formData.message}`,
             </div>
           )}
 
-          <form onSubmit={handleContactSubmit}>\n            <label className="sr-only" htmlFor="contact-full-name">Full Name</label>
+          <form onSubmit={handleContactSubmit}>
+            <label className="sr-only" htmlFor="contact-full-name">Full Name</label>
             <input
+              id="contact-full-name"
               type="text"
               name="fullName"
               placeholder="Full Name"
@@ -156,7 +158,9 @@ ${formData.message}`,
               onChange={handleChange}
             />
 
+            <label className="sr-only" htmlFor="contact-email">Email Address</label>
             <input
+              id="contact-email"
               type="email"
               name="email"
               placeholder="Email Address"
@@ -165,7 +169,9 @@ ${formData.message}`,
               onChange={handleChange}
             />
 
+            <label className="sr-only" htmlFor="contact-whatsapp">WhatsApp Number</label>
             <input
+              id="contact-whatsapp"
               type="tel"
               name="whatsapp"
               placeholder="WhatsApp Number"
@@ -174,7 +180,9 @@ ${formData.message}`,
               onChange={handleChange}
             />
 
+            <label className="sr-only" htmlFor="contact-message">How can we help you?</label>
             <textarea
+              id="contact-message"
               name="message"
               rows="6"
               placeholder="How can we help you?"

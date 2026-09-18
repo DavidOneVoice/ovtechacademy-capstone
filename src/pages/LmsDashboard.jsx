@@ -416,7 +416,7 @@ const LmsDashboard = () => {
     };
 
     loadCertificateProfile();
-  }, [student?.id]);
+  }, [student]);
 
   useEffect(() => {
     if (!student?.id || !isInstructorLedStudent(student)) {

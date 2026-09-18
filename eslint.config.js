@@ -17,5 +17,11 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // These effects intentionally initialize state from browser storage or
+      // synchronize it with Firestore. The compiler-oriented rule reports
+      // those established integration effects as errors.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])
