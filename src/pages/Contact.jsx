@@ -134,19 +134,19 @@ ${formData.message}`,
           <h2>Send Us a Message</h2>
 
           {success && (
-            <div className="contact-success">
+            <div className="contact-success" role="status" aria-live="polite">
               Your message has been sent successfully. We’ll get back to you
               soon.
             </div>
           )}
 
           {error && (
-            <div className="contact-error">
+            <div className="contact-error" role="alert">
               Something went wrong. Please try again.
             </div>
           )}
 
-          <form onSubmit={handleContactSubmit}>
+          <form onSubmit={handleContactSubmit}>\n            <label className="sr-only" htmlFor="contact-full-name">Full Name</label>
             <input
               type="text"
               name="fullName"
@@ -195,13 +195,13 @@ ${formData.message}`,
 
         <p>Chat directly with our admissions team on WhatsApp.</p>
 
-        <a href="https://wa.me/2348130624789" target="_blank" rel="noreferrer">
+        <a href="https://wa.me/2348130624789" target="_blank" rel="noopener noreferrer">
           Chat With Us On WhatsApp
         </a>
       </section>
 
       {showBackToTop && (
-        <button className="ov-back-top" onClick={scrollToTop}>
+        <button className="ov-back-top" onClick={scrollToTop} aria-label="Back to top">
           <NorthIcon style={{ fontSize: "2rem", color: "#fff" }} />
         </button>
       )}
